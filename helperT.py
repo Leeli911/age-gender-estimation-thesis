@@ -96,8 +96,8 @@ def get_dataloaders(base_dir):
 
 # ========== 加载 CityFace 图像数据（适用于分类） ==========
 def get_img_dataloaders(base_dir):
-    csv_file = "data/1_CityFace/CF_images_data.csv"
-    img_dir = "data/1_CityFace/images"
+    csv_file = "data/1_CityFace/filtered_data.csv"
+    img_dir = "data/1_CityFace/cropped_faces"
     dataset = FaceDataset1(csv_file=csv_file, img_dir=img_dir, img_size=224, augment=True)
     train_size = int(0.9 * len(dataset))
     valid_size = len(dataset) - train_size
@@ -158,7 +158,7 @@ def get_img_dataloaders_full(base_dir='', batch_size=64, img_size=224, num_worke
         transforms.Normalize([0.5]*3, [0.5]*3)
     ])
 
-    img_dir = os.path.join(base_dir, "data/1_CityFace/images")
+    img_dir = os.path.join(base_dir, "data/1_CityFace/cropped_faces")
 
     train_dataset = FaceDataset1(dataframe=train_df, img_dir=img_dir, transform=transform, augment=True)
     val_dataset = FaceDataset1(dataframe=val_df, img_dir=img_dir, transform=transform, augment=False)
