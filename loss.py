@@ -146,26 +146,29 @@ class AgeGenderLoss(nn.Module):
         else:
             raise ValueError("age_task must be 'regression' or 'group_classification'")
 
-        # 使用和模型5一致的 FocalLoss 设置
         self.gender_loss_fn = FocalLoss(gamma=2.0, alpha=[0.2, 0.8])
 
     def forward(self, age_pred, gender_pred, age_true, gender_true):
         if self.age_task == 'regression':
             age_loss = self.age_loss_fn(age_pred.squeeze(), age_true.float())
         else:
-            age_true_group = torch.tensor([self.get_group_label(age.item()) for age in age_true], device=age_pred.device)
+            # ✅ 使用向量化方式计算 age_true_group，避免 for 循环 + .item() 低效写法
+            age_true_group = self.get_group_label_tensor(age_true)
+
             age_loss = self.age_loss_fn(age_pred, age_true_group)
 
         gender_loss = self.gender_loss_fn(gender_pred, gender_true.long())
         return self.age_weight * age_loss + self.gender_weight * gender_loss
 
     @staticmethod
-    def get_group_label(age):
-        if age < 19: return 0
-        elif age < 30: return 1
-        elif age < 40: return 2
-        elif age < 60: return 3
-        else: return 4
+    def get_group_label_tensor(ages):
+        group = torch.zeros_like(ages, dtype=torch.long)
+        group[(ages >= 19) & (ages < 30)] = 1
+        group[(ages >= 30) & (ages < 40)] = 2
+        group[(ages >= 40) & (ages < 60)] = 3
+        group[(ages >= 60)] = 4
+        return group
+
 
 
 

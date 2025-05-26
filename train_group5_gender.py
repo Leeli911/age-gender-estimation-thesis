@@ -4,6 +4,7 @@ from torch.optim import SGD
 from torch.optim.lr_scheduler import StepLR
 from sklearn.metrics import mean_absolute_error, accuracy_score, precision_score, recall_score, f1_score
 from tqdm import tqdm
+from collections import Counter
 
 from collections import defaultdict
 
@@ -132,6 +133,14 @@ for epoch in range(EPOCH):
 
             val_loss += loss.item()
 
+            # 统计每个 batch 的预测年龄组和性别的分布
+            val_age_group_counter = Counter(val_preds)
+            val_gender_counter = Counter(gender_preds_all)
+
+            # print(f"Epoch {epoch+1} - Age Group Prediction Counts: {dict(val_age_group_counter)}")
+            # print(f"Epoch {epoch+1} - Gender Prediction Counts: {dict(val_gender_counter)}")
+
+
             pred_groups = torch.argmax(age_output, dim=1).cpu().numpy()
             val_preds.extend(pred_groups)
             val_preds_age.extend([group_centers[p] for p in pred_groups])
@@ -197,14 +206,14 @@ for epoch in range(EPOCH):
 
 
 # ========== 绘图 ==========
-plt.figure()
+plt.figure(figsize=(6, 4.5))
 plt.plot(train_losses, label='Train Loss')
 plt.plot(val_losses, label='Val Loss')
 plt.legend()
 plt.title('Loss Curve')
 plt.savefig(os.path.join(log_dir, 'loss_curve.png'))
 
-plt.figure()
+plt.figure(figsize=(6, 4.5))
 plt.plot(val_maes, label='Val MAE')
 plt.title('Validation MAE')
 plt.savefig(os.path.join(log_dir, 'val_mae_curve.png'))
@@ -277,7 +286,7 @@ with open(os.path.join(log_dir, 'test_predictions.csv'), 'w', newline='') as f:
 
 
 # ========== 测试集散点图 ==========
-plt.figure(figsize=(8, 6))
+plt.figure(figsize=(6, 4.5))
 plt.scatter(test_gts, test_preds, alpha=0.5)
 plt.xlabel('Ground Truth Group')
 plt.ylabel('Predicted Group')

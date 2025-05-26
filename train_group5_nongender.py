@@ -35,7 +35,8 @@ train_loader, val_loader, test_loader = get_img_dataloaders_full(base_dir='')
 # ========== 模型 & 优化器 ==========
 model = AgePredictionModel(task='group_classification').to(device)
 # [Modified] Use weighted CrossEntropyLoss to handle group imbalance
-weights = torch.tensor([1.0, 1.0, 1.0, 1.0, 8.0], dtype=torch.float32).to(device)
+weights = torch.tensor([1.0, 1.2, 1.2, 1.5, 10.0], dtype=torch.float32).to(device)
+# criterion = AgeOnlyLoss(task='group_classification')
 criterion = nn.CrossEntropyLoss(weight=weights)
 
 optimizer = SGD(model.parameters(), lr=TRAIN_LR, momentum=MOMENTUM, weight_decay=WEIGHT_DECAY)
@@ -170,14 +171,14 @@ for epoch in range(EPOCH):
             break
 
 # ========== 绘图 ==========
-plt.figure()
+plt.figure(figsize=(6, 4.5))
 plt.plot(train_losses, label='Train Loss')
 plt.plot(val_losses, label='Val Loss')
 plt.legend()
 plt.title('Loss Curve')
 plt.savefig(os.path.join(log_dir, 'loss_curve.png'))
 
-plt.figure()
+plt.figure(figsize=(6, 4.5))
 plt.plot(val_maes, label='Val MAE')
 plt.title('Validation MAE')
 plt.savefig(os.path.join(log_dir, 'val_mae_curve.png'))

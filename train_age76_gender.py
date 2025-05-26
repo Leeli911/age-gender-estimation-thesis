@@ -173,14 +173,14 @@ for epoch in range(EPOCH):
 
 
 # ========== 绘图 ==========
-plt.figure()
+plt.figure(figsize=(6, 4.5))
 plt.plot(train_losses, label='Train Loss')
 plt.plot(val_losses, label='Validation Loss')
 plt.legend()
 plt.title('Loss Curve')
 plt.savefig(os.path.join(log_dir, 'loss_curve.png'))
 
-plt.figure()
+plt.figure(figsize=(6, 4.5))
 plt.plot(val_maes, label='Validation MAE')
 plt.title('Validation MAE')
 plt.savefig(os.path.join(log_dir, 'val_mae_curve.png'))

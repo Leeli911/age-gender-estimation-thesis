@@ -1,47 +1,72 @@
-import cv2
-from mtcnn import MTCNN
 import os
+import cv2
+from insightface.app import FaceAnalysis
+from tqdm import tqdm
+import numpy as np
 
-def detect_and_crop_faces_mtcnn(image_path, output_folder):
-    detector = MTCNN()
+# ====================
+# 配置路径
+# ====================
+input_root = '/mimer/NOBACKUP/groups/naiss2025-22-39/lili_project/history_age_predict_mtcnn/data/1_CityFace/images'  # 原始图像目录
+output_root = '/mimer/NOBACKUP/groups/naiss2025-22-39/lili_project/history_age_predict_mtcnn/data/1_CityFace/cropped_faces'  # 裁剪后保存路径
+image_size = (224, 224)  # 模型需要的输入大小
+save_all_faces = False   # 是否保存所有人脸，默认只保留面积最大的一张
 
-    img = cv2.imread(image_path)
-    if img is None:
-        print(f"[警告] 无法读取图像: {image_path}")
-        return
+# 初始化 InsightFace
+app = FaceAnalysis(name="buffalo_l", providers=['CUDAExecutionProvider', 'CPUExecutionProvider'])
+app.prepare(ctx_id=0, det_size=(640, 640))
 
-    faces = detector.detect_faces(img)
-    if not faces:
-        print(f"[警告] 未检测到人脸: {image_path}")
-        return
+# 创建输出文件夹
+os.makedirs(output_root, exist_ok=True)
 
-    os.makedirs(output_folder, exist_ok=True)
+# 遍历所有图像文件
+for root, _, files in os.walk(input_root):
+    for fname in tqdm(files):
+        if not fname.lower().endswith(('.jpg', '.jpeg', '.png')):
+            continue
 
-    face = faces[0]
-    x, y, w, h = face['box']
-    x, y = max(0, x), max(0, y)
+        fpath = os.path.join(root, fname)
+        rel_path = os.path.relpath(fpath, input_root)
+        save_subdir = os.path.join(output_root, os.path.dirname(rel_path))
+        os.makedirs(save_subdir, exist_ok=True)
 
-    face_crop = img[y:y+h, x:x+w]
+        try:
+            img = cv2.imread(fpath)
+            if img is None:
+                print(f'[WARN] Cannot read image: {fpath}')
+                continue
 
-    filename = os.path.splitext(os.path.basename(image_path))[0]
-    output_path = os.path.join(output_folder, f"{filename}.jpg")
+            faces = app.get(img)
+            if not faces:
+                print(f'[INFO] No face found in: {fpath}')
+                continue
 
-    cv2.imwrite(output_path, face_crop)
-    print(f"[INFO] 人脸已保存: {output_path}")
+            # 选择最大面积人脸或所有人脸
+            if not save_all_faces:
+                faces = [max(faces, key=lambda f: (f.bbox[2] - f.bbox[0]) * (f.bbox[3] - f.bbox[1]))]
 
+            for i, face in enumerate(faces):
+                x1, y1, x2, y2 = map(int, face.bbox)
+                h, w = img.shape[:2]
+                # 修正 bbox 越界
+                x1 = max(0, x1)
+                y1 = max(0, y1)
+                x2 = min(w, x2)
+                y2 = min(h, y2)
 
-def batch_process_images(input_folder, output_folder):
-    # 递归处理子目录
-    for root, dirs, files in os.walk(input_folder):
-        for file in files:
-            if file.lower().endswith(('.jpg', '.jpeg', '.png')):
-                image_path = os.path.join(root, file)
-                relative_path = os.path.relpath(root, input_folder)
-                save_folder = os.path.join(output_folder, relative_path)
-                detect_and_crop_faces_mtcnn(image_path, save_folder)
+                cropped = img[y1:y2, x1:x2]
+                if cropped.size == 0 or (y2 - y1 <= 5 or x2 - x1 <= 5):
+                    print(f'[WARN] Empty or invalid crop in: {fpath}')
+                    continue
 
+                resized = cv2.resize(cropped, image_size)
 
-if __name__ == "__main__":
-    input_folder = "data/1_CityFace/images"  # ✅ 修改为 Unix 路径风格
-    output_dir = "data/1_CityFace/cropped_faces"
-    batch_process_images(input_folder, output_dir)
+                # 命名规则：原图名_face{i}.jpg
+                base_name = os.path.splitext(os.path.basename(fpath))[0]
+                save_name = f'{base_name}_face{i}.jpg' if save_all_faces else f'{base_name}.jpg'
+                save_path = os.path.join(save_subdir, save_name)
+
+                cv2.imwrite(save_path, resized)
+
+        except Exception as e:
+            print(f'[ERROR] Failed to process {fpath}: {str(e)}')

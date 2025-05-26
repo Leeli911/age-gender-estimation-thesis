@@ -64,6 +64,7 @@ EARLY_STOPPING_PATIENCE = 30
 
 
 # ========== 加载 Appa-Real 特征数据（回归用） ==========
+# 加载 Appa-Real 特征数据（回归）
 def get_dataloaders(base_dir):
     global img_d
     img_d = base_dir + "appa-real-release/"
@@ -71,110 +72,107 @@ def get_dataloaders(base_dir):
         def __init__(self, sub='train'):
             if sub not in ["train", "test", "val"]:
                 raise NotImplementedError
-            if sub != 'test':
-                self.age = np.loadtxt(base_dir + sub + ".txt", delimiter=',')
-            else:
-                self.age = np.random.rand(500) * 100
+            self.age = (np.loadtxt(base_dir + sub + ".txt", delimiter=',')
+                         if sub != 'test' else np.random.rand(500) * 100)
             self.features = np.load(base_dir + 'feature_' + sub + '.npy')
             assert len(self.age) == len(self.features)
-
-        def __len__(self):
-            return len(self.age)
-
-        def __getitem__(self, idx):
-            return self.age[idx], self.features[idx]
+        def __len__(self): return len(self.age)
+        def __getitem__(self, idx): return self.age[idx], self.features[idx]
 
     train_dataset = FaceNPDataset('train')
-    val_dataset = FaceNPDataset('val')
-    test_dataset = FaceNPDataset('test')
+    val_dataset   = FaceNPDataset('val')
+    test_dataset  = FaceNPDataset('test')
 
-    train_loader = DataLoader(train_dataset, batch_size=BATCH_SIZE, shuffle=False, num_workers=NUM_WORKER, drop_last=False)
-    val_loader = DataLoader(val_dataset, batch_size=BATCH_SIZE, shuffle=False, num_workers=NUM_WORKER, drop_last=False)
-    test_loader = DataLoader(test_dataset, batch_size=BATCH_SIZE, shuffle=False, num_workers=NUM_WORKER, drop_last=False)
-
+    train_loader = DataLoader(train_dataset, batch_size=BATCH_SIZE, shuffle=False, num_workers=NUM_WORKER)
+    val_loader   = DataLoader(val_dataset,   batch_size=BATCH_SIZE, shuffle=False, num_workers=NUM_WORKER)
+    test_loader  = DataLoader(test_dataset,  batch_size=BATCH_SIZE, shuffle=False, num_workers=NUM_WORKER)
     return train_loader, val_loader, test_loader
 
 # ========== 加载 CityFace 图像数据（适用于分类） ==========
 def get_img_dataloaders(base_dir):
-    csv_file = "data/1_CityFace/filtered_data.csv"
-    img_dir = "data/1_CityFace/cropped_faces"
+    csv_file = "/mimer/NOBACKUP/groups/naiss2025-22-39/lili_project/history_age_predict_mtcnn/data/1_CityFace/filtered_data.csv"
+    img_dir = "/mimer/NOBACKUP/groups/naiss2025-22-39/lili_project/history_age_predict_mtcnn/data/1_CityFace/cropped_faces"
     dataset = FaceDataset1(csv_file=csv_file, img_dir=img_dir, img_size=224, augment=True)
+    dataset = FaceDataset1(csv_file=csv_file, img_dir=img_dir, img_size=224, augment=True)
+    # 训练增强：随机裁剪、水平翻转、色彩抖动
+    train_transform = transforms.Compose([
+        transforms.RandomResizedCrop(img_size, scale=(0.8, 1.0)),
+        transforms.RandomHorizontalFlip(),
+        transforms.ColorJitter(brightness=0.2, contrast=0.2, saturation=0.2, hue=0.1),
+        transforms.ToTensor(),
+        transforms.Normalize(mean=[0.5]*3, std=[0.5]*3)
+    ])
+    # 验证增强：Resize + ToTensor + Normalize
+    val_transform   = transforms.Compose([
+        transforms.Resize((img_size, img_size)),
+        transforms.ToTensor(),
+        transforms.Normalize(mean=[0.5]*3, std=[0.5]*3)
+    ])
+
+    dataset = FaceDataset1(csv_file=csv_file, img_dir=img_dir, img_size=img_size,
+                           augment=True, transform=train_transform)
     train_size = int(0.9 * len(dataset))
     valid_size = len(dataset) - train_size
     train_dataset, val_dataset = random_split(dataset, [train_size, valid_size])
+    # 分别赋予不同 transform
+    train_dataset.dataset.transform = train_transform
+    val_dataset.dataset.transform   = val_transform
 
     train_loader = DataLoader(train_dataset, batch_size=BATCH_SIZE, shuffle=True, num_workers=NUM_WORKER, drop_last=True)
-    val_loader = DataLoader(val_dataset, batch_size=BATCH_SIZE, shuffle=False, num_workers=NUM_WORKER, drop_last=False)
+    val_loader   = DataLoader(val_dataset,   batch_size=BATCH_SIZE, shuffle=False, num_workers=NUM_WORKER)
     return train_loader, val_loader
 
 # ========== CityFace 版本三段式拆分（含 test set）==========
 def get_img_dataloaders_full(base_dir='', batch_size=64, img_size=224, num_workers=4):
-    csv_path = os.path.join(base_dir, 'data/1_CityFace/filtered_data.csv')
-    full_df = pd.read_csv(csv_path)
-
-    full_df["Group"] = full_df["Age"].apply(get_group5_label)
-
-    # 只保留 Age 样本数 >= 2 的
+    csv_path = '/mimer/NOBACKUP/groups/naiss2025-22-39/lili_project/history_age_predict_mtcnn/data/1_CityFace/filtered_data.csv'
+    full_df  = pd.read_csv(csv_path)
+    full_df['Group'] = full_df['Age'].apply(get_group5_label)
     age_counts = full_df['Age'].value_counts()
-    valid_ages = age_counts[age_counts >= 2].index
+    valid_ages = age_counts[age_counts>=2].index
     full_df = full_df[full_df['Age'].isin(valid_ages)].reset_index(drop=True)
-
-    # STEP 1: 初步划分 train 和 temp（用 age stratify）
-    train_df, temp_df = train_test_split(
-        full_df,
-        test_size=0.2,
-        random_state=42,
-        stratify=full_df['Age']
-    )
-
-    # STEP 2: 过滤 temp 中 group 数量 < 2 的
-    group_counts = temp_df["Group"].value_counts()
-    valid_groups = group_counts[group_counts >= 2].index.tolist()
-    temp_df = temp_df[temp_df["Group"].isin(valid_groups)].reset_index(drop=True)
-
-    # STEP 3: 手动将 temp 拆分成 val/test，确保每组 group 至少有 1 个样本
-    val_df, test_df = [], []
+    train_df, temp_df = train_test_split(full_df, test_size=0.2, random_state=42, stratify=full_df['Age'])
+    group_counts = temp_df['Group'].value_counts()
+    valid_groups = group_counts[group_counts>=2].index.tolist()
+    temp_df = temp_df[temp_df['Group'].isin(valid_groups)].reset_index(drop=True)
+    val_parts, test_parts = [], []
     for g in valid_groups:
-        group_temp = temp_df[temp_df["Group"] == g]
-        if len(group_temp) < 2:
-            continue
-        val_part, test_part = train_test_split(group_temp, test_size=0.5, random_state=42)
-        val_df.append(val_part)
-        test_df.append(test_part)
+        grp = temp_df[temp_df['Group']==g]
+        if len(grp)<2: continue
+        v,t = train_test_split(grp, test_size=0.5, random_state=42)
+        val_parts.append(v); test_parts.append(t)
+    val_df  = pd.concat(val_parts).reset_index(drop=True)
+    test_df = pd.concat(test_parts).reset_index(drop=True)
 
-    val_df = pd.concat(val_df).reset_index(drop=True)
-    test_df = pd.concat(test_df).reset_index(drop=True)
-
-    # 打印验证集分布情况
-    print("Validation set group counts:")
-    print(val_df["Group"].value_counts())
-
-    # ========== 图像转换 ========== #
-    transform = transforms.Compose([
-        transforms.Resize((img_size, img_size)),
-        transforms.RandomHorizontalFlip(p=0.5),
-        transforms.ColorJitter(brightness=0.2, contrast=0.2, saturation=0.2),
+    # 训练增强
+    train_transform = transforms.Compose([
+        transforms.RandomResizedCrop(img_size, scale=(0.8,1.0)),
+        transforms.RandomHorizontalFlip(),
+        transforms.ColorJitter(brightness=0.2, contrast=0.2, saturation=0.2, hue=0.1),
         transforms.ToTensor(),
-        transforms.Normalize([0.5]*3, [0.5]*3)
+        transforms.Normalize(mean=[0.5]*3, std=[0.5]*3)
     ])
+    # 验证/测试增强
+    eval_transform  = transforms.Compose([
+        transforms.Resize((img_size,img_size)),
+        transforms.ToTensor(),
+        transforms.Normalize(mean=[0.5]*3, std=[0.5]*3)
+    ])
+    img_dir = '/mimer/NOBACKUP/groups/naiss2025-22-39/lili_project/history_age_predict_mtcnn/data/1_CityFace/cropped_faces'
 
-    img_dir = os.path.join(base_dir, "data/1_CityFace/cropped_faces")
+    train_dataset = FaceDataset1(dataframe=train_df,  img_dir=img_dir, img_size=img_size, augment=True,  transform=train_transform)
+    val_dataset   = FaceDataset1(dataframe=val_df,    img_dir=img_dir, img_size=img_size, augment=False, transform=eval_transform)
+    test_dataset  = FaceDataset1(dataframe=test_df,   img_dir=img_dir, img_size=img_size, augment=False, transform=eval_transform)
 
-    train_dataset = FaceDataset1(dataframe=train_df, img_dir=img_dir, transform=transform, augment=True)
-    val_dataset = FaceDataset1(dataframe=val_df, img_dir=img_dir, transform=transform, augment=False)
-    test_dataset = FaceDataset1(dataframe=test_df, img_dir=img_dir, transform=transform, augment=False)
-
-    train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True, num_workers=num_workers)
-    val_loader = DataLoader(val_dataset, batch_size=batch_size, shuffle=False, num_workers=num_workers)
-    test_loader = DataLoader(test_dataset, batch_size=batch_size, shuffle=False, num_workers=num_workers)
-
+    train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True,  num_workers=num_workers)
+    val_loader   = DataLoader(val_dataset,   batch_size=batch_size, shuffle=False, num_workers=num_workers)
+    test_loader  = DataLoader(test_dataset,  batch_size=batch_size, shuffle=False, num_workers=num_workers)
     return train_loader, val_loader, test_loader
 
 # ========== 显示验证图片 & 对比预测结果 ==========
 def show_data(base_dir):
     global img_d, img_n
     img_d = base_dir
-    plt.figure(figsize=(15, 8))
+    plt.figure(figsize=(6, 5))
     img_list = sorted([f for f in os.listdir(img_d + 'valid/') if len(f) == 19], key=lambda x: x[:6])
     for i, name in enumerate(img_list[::-1][:6]):
         img = Image.open(img_d + 'valid/' + name)
@@ -183,7 +181,7 @@ def show_data(base_dir):
         plt.imshow(img)
 
 def show_results(preds, gt):
-    plt.figure(figsize=(15, 8))
+    plt.figure(figsize=(6, 5))
     for i in range(6):
         img = cv2.imread(img_d + 'valid/' + img_n[i])
         img = cv2.resize(img, (225, 225))

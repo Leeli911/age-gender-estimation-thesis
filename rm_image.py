@@ -13,8 +13,8 @@ def filter_existing_images(csv_path, image_folder, output_csv):
     print(f"处理完成，已保存到 {output_csv}")
 
 if __name__ == "__main__":
-    csv_path = "data/1_CityFace/CF_images_data.csv"
-    image_folder = "data/1_CityFace/cropped_faces"
-    output_csv = "data/1_CityFace/filtered_data.csv"
+    csv_path = "/mimer/NOBACKUP/groups/naiss2025-22-39/lili_project/history_age_predict_mtcnn/data/1_CityFace/CF_images_data.csv"
+    image_folder = "/mimer/NOBACKUP/groups/naiss2025-22-39/lili_project/history_age_predict_mtcnn/data/1_CityFace/cropped_faces"
+    output_csv = "/mimer/NOBACKUP/groups/naiss2025-22-39/lili_project/history_age_predict_mtcnn/data/1_CityFace/filtered_data.csv"
 
     filter_existing_images(csv_path, image_folder, output_csv)

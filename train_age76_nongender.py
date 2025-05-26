@@ -162,14 +162,14 @@ for epoch in range(EPOCH):
             break
 
 # ========== 绘图保存 ==========
-plt.figure()
+plt.figure(figsize=(6, 4.5))
 plt.plot(train_losses, label='Train Loss')
 plt.plot(val_losses, label='Validation Loss')
 plt.legend()
 plt.title('Loss Curve')
 plt.savefig(os.path.join(log_dir, 'loss_curve.png'))
 
-plt.figure()
+plt.figure(figsize=(6, 4.5))
 plt.plot(val_maes, label='Validation MAE')
 plt.title('Validation MAE')
 plt.savefig(os.path.join(log_dir, 'val_mae_curve.png'))
@@ -193,7 +193,7 @@ with torch.no_grad():
         test_gts.extend(ages_np[valid_mask])
 
 # 保存测试预测结果图像
-plt.figure()
+plt.figure(figsize=(6, 4.5))
 plt.scatter(test_gts, test_preds, alpha=0.5)
 plt.xlabel('Ground Truth Age')
 plt.ylabel('Predicted Age')
