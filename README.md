@@ -1,6 +1,7 @@
+```markdown
 # Age and Gender Estimation from Historical Portraits
 
-This repository contains the full implementation of five deep learning models for age and gender prediction from historical facial images. The models were developed and evaluated as part of the master's thesis titled:
+This repository implements five deep learning models for facial age and gender estimation using historical portrait images. The models were developed as part of the master's thesis:
 
 **"From Faces to Ages: Enhancing Historical Recognition with Transfer Learning"**
 
@@ -8,129 +9,114 @@ This repository contains the full implementation of five deep learning models fo
 
 ## Overview
 
-The study explores the impact of task design, gender supervision, and data balancing strategies on facial age estimation. Five models are implemented and evaluated:
+The project investigates how task formulation, gender supervision, and dataset balancing affect prediction performance and fairness. It includes:
 
-| Model   | Description                                      |
-|---------|--------------------------------------------------|
-| Model 1 | Multi-task age regression + gender classification |
-| Model 2 | Single-task age regression only                   |
-| Model 3 | Multi-task age group classification + gender      |
-| Model 4 | Single-task age group classification only         |
-| Model 5 | Cascaded gender-specific age regression           |
-
-Each model is implemented in its own training script and shares common data processing and architecture utilities.
+| Model | Description                                     |
+|-------|-------------------------------------------------|
+| M1    | Multi-task regression with gender classification |
+| M2    | Single-task age regression only                  |
+| M3    | Grouped age classification with gender           |
+| M4    | Grouped age classification only                  |
+| M5    | Cascaded regression conditioned on gender        |
 
 ---
 
-## Directory Structure
+## Code Structure
 
-```bash
+```
+
 .
-├── train_age76_gender.py            # Model 1 training script
-├── train_age76_nongender.py        # Model 2 training script
-├── train_group5_gender.py          # Model 3 training script
-├── train_group5_nongender.py       # Model 4 training script
-├── train_cascade_gender_age.py     # Model 5 training script
-├── helperT.py                      # Data loading, preprocessing, stratified splitting
-├── model.py                        # Backbone and output head definitions (ConvNeXtV2, SE-ResNeXt50)
-├── loss.py                         # Custom loss functions (AgeGenderLoss, AgeOnlyLoss, CascadeLoss)
-├── run_all.py                      # Batch training automation script
-├── requirements.txt                # Python package requirements
-└── README.md                       # This file
+├── train\_age76\_gender.py         # M1
+├── train\_age76\_nongender.py     # M2
+├── train\_group5\_gender.py       # M3
+├── train\_group5\_nongender.py    # M4
+├── train\_cascade\_gender\_age.py  # M5
+├── model.py                     # Backbone and architecture
+├── loss.py                      # Custom loss functions
+├── helperT.py                   # Dataset loading and splitting
+├── run\_models.sh                # Full model training across datasets
+├── analyze\_merged\_data.ipynb    # Dataset analysis notebook
+└── README.md                    # Project description
+
 ````
 
 ---
 
-## Reproducing Results
+## Setup
 
-### 1. Environment Setup
+This project requires:
 
-This project was developed and tested with:
+- Python 3.11
+- PyTorch ≥ 2.0
+- torchvision ≥ 0.15
+- timm ≥ 0.9.2
+- scikit-learn, matplotlib, pandas
 
-* Python 3.11
-* PyTorch 2.0+
-* torchvision 0.15+
-* timm >= 0.9.2
-* scikit-learn
-* matplotlib
-* pandas
-
-Install dependencies:
+Install all dependencies:
 
 ```bash
 pip install -r requirements.txt
-```
+````
 
 ---
 
-### 2. Dataset Preparation
+## Data Preparation
 
-The models require preprocessed datasets containing:
+Each training script expects:
 
-* Cropped and aligned face images (using MTCNN)
-* Associated CSV files with `image_name`, `age`, `gender`, and optionally `group` annotations
+* Pre-cropped and aligned face images (via MTCNN or InsightFace)
+* Metadata CSVs with columns: `image_name`, `age`, `gender`, and optionally `group` (for age group labels)
 
-Organize your data in a directory structure compatible with `helperT.py`.
+Ensure that data organization aligns with the logic in `helperT.py`.
 
 ---
 
-### 3. Training a Model
+## Model Training
 
-Example: Train Model 1 (age + gender regression)
+To train a specific model:
 
 ```bash
-python train_age76_gender.py
+python train_age76_gender.py  # Example: Model 1
 ```
 
-Model checkpoints, logs, and plots will be saved automatically under:
-
-```
-logs_age76_gender/
-├── best_model.pth
-├── train.log
-├── loss_curve.png
-├── val_mae_curve.png
-├── test_scatter.png
-└── test_predictions.csv
-```
-
-To train all five models in sequence:
+To train all five models under both MTCNN and InsightFace data setups:
 
 ```bash
-python run_all.py
+bash run_models.sh
 ```
 
----
-
-## Outputs and Evaluation
-
-Each model logs:
-
-* Training and validation loss
-* Validation MAE per epoch
-* Final test MAE and group-wise MAE
-* Scatter plots of predicted vs. ground-truth age
+Trained weights, logs, and visualizations will be saved under model-specific folders.
 
 ---
 
-## Thesis Link
+## Output and Evaluation
 
-This repository supports the thesis submitted to Uppsala University, Department of Information Technology, for the degree of Master in Data Science.
+Each model outputs:
 
-**\[Insert PDF Thesis Link Here]**
+* Training/validation loss curves
+* Group-wise and overall MAE
+* Gender classification metrics (if applicable)
+* Residual plots and scatter plots for calibration inspection
+
+These are saved automatically during training.
 
 ---
 
-## License
+## Thesis Reference
 
-This code is intended for academic research purposes only. Contact the author for any commercial or redistribution inquiries.
+This repository supports the Master's thesis submitted to Uppsala University:
+
+**From Faces to Ages: Enhancing Historical Recognition with Transfer Learning**
+\[Insert final thesis PDF link here]
 
 ---
 
-## Contact
+## License and Contact
 
-Li Li
-Master's Student, Data Science
-Uppsala University, Sweden
+This code is released for academic use only.
+
+Author: Li Li
+Program: MSc in Data Science, Uppsala University
 Email: `li.li.5064@student.uu.se`
 
+```
